@@ -1,0 +1,38 @@
+--- a/processtransformer/data/processor.py	2026-11-21 15:01:19.497733501 +0100
++++ b/processtransformer/data/processor.py	2026-11-21 15:03:25.855484960 +0100
+@@ -35,7 +35,7 @@
+         df["concept:name"] = df["concept:name"].str.replace(" ", "-")
+         df["time:timestamp"] = df["time:timestamp"].str.replace("/", "-")
+         df["time:timestamp"]= pd.to_datetime(df["time:timestamp"],  
+-            dayfirst=True).map(lambda x: x.strftime("%Y-%m-%d %H:%M:%S"))
++            dayfirst=False).map(lambda x: x.strftime("%Y-%m-%d %H:%M:%S"))  # FIX(Jules): original dayfirst=True mis-parses/crashes on YYYY/MM/DD timestamps with pandas>=2
+         if sort_temporally:
+             df.sort_values(by = ["time:timestamp"], inplace = True)
+         return df
+@@ -73,7 +73,7 @@
+         return processed_df
+ 
+     def _process_next_activity(self, df, train_list, test_list):
+-        df_split = np.array_split(df, self._pool)
++        df_split = [df.iloc[ix] for ix in np.array_split(np.arange(len(df)), self._pool)]  # FIX(Jules): np>=2 array_split returns ndarrays, not DataFrames
+         with Pool(processes=self._pool) as pool:
+             processed_df = pd.concat(pool.imap_unordered(self._next_activity_helper_func, df_split))
+         train_df = processed_df[processed_df["case_id"].isin(train_list)]
+@@ -126,7 +126,7 @@
+         return processed_df_time
+ 
+     def _process_next_time(self, df, train_list, test_list):
+-        df_split = np.array_split(df, self._pool)
++        df_split = [df.iloc[ix] for ix in np.array_split(np.arange(len(df)), self._pool)]  # FIX(Jules): np>=2 array_split returns ndarrays, not DataFrames
+         with Pool(processes=self._pool) as pool:
+             processed_df = pd.concat(pool.imap_unordered(self._next_time_helper_func, df_split))
+         train_df = processed_df[processed_df["case_id"].isin(train_list)]
+@@ -179,7 +179,7 @@
+         return processed_df_remaining_time
+ 
+     def _process_remaining_time(self, df, train_list, test_list):
+-        df_split = np.array_split(df, self._pool)
++        df_split = [df.iloc[ix] for ix in np.array_split(np.arange(len(df)), self._pool)]  # FIX(Jules): np>=2 array_split returns ndarrays, not DataFrames
+         with Pool(processes=self._pool) as pool:
+             processed_df = pd.concat(pool.imap_unordered(self._remaining_time_helper_func, df_split))
+         train_remaining_time = processed_df[processed_df["case_id"].isin(train_list)]
