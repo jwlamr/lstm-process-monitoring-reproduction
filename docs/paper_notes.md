@@ -1,66 +1,53 @@
-# Paper notes — ProcessTransformer (Bukhsh, Saeed & Dijkman, 2021)
+# Paper notes — Tax, Verenich, La Rosa & Dumas (2017)
 
-**Reference:** Z. A. Bukhsh, A. Saeed, R. M. Dijkman. *ProcessTransformer: Predictive Business Process Monitoring with Transformer Network.* arXiv:2104.00721, 2021. Eindhoven University of Technology.
-**Code:** https://github.com/Zaharah/processtransformer (MIT licence, also on PyPI as `processtransformer`)
+**Reference:** N. Tax, I. Verenich, M. La Rosa, M. Dumas. *Predictive Business Process Monitoring with LSTM Neural Networks.* Proceedings of the 29th International Conference on Advanced Information Systems Engineering (CAiSE 2017), Springer LNCS, pp. 477–492. [arXiv:1612.02130](https://arxiv.org/abs/1612.02130)
+**Code:** https://github.com/verenich/ProcessSequencePrediction
+**Why a "pillar" paper:** cited 738 times (OpenAlex, November 2026). It is the reference baseline of predictive process monitoring: later approaches (Camargo et al. 2019, CNN-based models, ProcessTransformer 2021…) all compare to it.
 
 ## 1. Business problem
 
-Companies record every step of their processes in IT systems (ERP, CRM, ticketing tools). Each record is an *event*: which case (ticket, loan application, order), which activity, and when. A list of events is called an **event log**.
+Companies record each step of their processes (tickets, loan applications, orders) in an **event log**: case ID, activity, timestamp. **Predictive business process monitoring** uses completed cases to make predictions about running cases:
 
-**Predictive Business Process Monitoring (PBPM)** uses these logs to answer questions about cases that are still running:
-
-| Task | Business question | Example (IT helpdesk) |
-|---|---|---|
-| Next activity | What will happen next? | Will this ticket be closed, or escalated to another team? |
-| Next event time | When will it happen? | How many days before the next action? |
-| Remaining time | When will the case be finished? | Will we meet the 7-day SLA? |
-
-Value for a company: anticipate delays, allocate staff, warn customers early, respect SLAs.
+| Task | Business question |
+|---|---|
+| Next activity | What will happen next in this case? |
+| Next event time | When will it happen? |
+| Suffix | What is the full remaining sequence of activities? |
+| Remaining time | When will the case be finished? (e.g. to prioritise cases and avoid deadline violations) |
 
 ## 2. Gap identified by the authors
 
-Earlier deep-learning approaches were mostly based on LSTMs (recurrent networks). According to the authors, they:
-- struggle with long traces (long-range dependencies);
-- often use one-hot encoding, which grows with the number of activities;
-- process events one by one, which limits parallel training;
-- often need hand-crafted features or a different architecture for each task.
+Existing methods were **tailor-made for one specific task** (one method for time, another for next activity…), and their accuracy varied a lot from one log to another and from one point in the case to another.
 
 ## 3. Method
 
-- **Input:** only the sequence of activity names of the running case (the *prefix*), encoded as integers and zero-padded to the longest trace.
-- **Embedding:** token embedding + positional embedding (36 dimensions).
-- **One Transformer block:** multi-head self-attention (4 heads) + feed-forward layer, with residual connections, dropout and layer normalisation.
-- **Pooling + dense layers + output:** softmax over activities (next activity), or a single linear output (time tasks).
-- **Time tasks:** three extra numeric features are concatenated: time since previous event, time since the event before that, time since case start.
-- **Losses:** cross-entropy (classification), log-cosh (regression).
-- **Training:** Adam, 100 epochs.
+- **Input per event:** one-hot encoding of the activity + time features: time since previous event, time within the day, time within the week (the code also adds the position in the case and the time since case start).
+- **Architecture:** LSTM network(s), 100 neurons per layer. Three variants: separate models for activity and time, fully shared multi-task model, and a hybrid with **shared layers followed by task-specific layers** (best overall).
+- **Outputs:** softmax over activities (+ an "end of case" symbol) and a regression output for the time until the next event.
+- **Losses:** cross-entropy (activity) and mean absolute error (time).
+- **Suffix and remaining time:** predicted by applying the model iteratively until "end of case" is predicted.
 
 ## 4. Experimental protocol
 
-- **9 public event logs** from the 4TU repository (Helpdesk, BPIC 2012 and variants, BPIC 2013, BPIC 2020, Hospital, Traffic fines).
-- **Split:** 80% of cases for training, 20% for testing (described as chronological); 20% of training held out for validation.
-- **All prefix lengths** are used, no filtering.
-- **Metrics:** accuracy and weighted F1 for next activity; MAE in days for time tasks. Metrics are computed for each prefix length k and then **averaged over k**.
+- **Logs:** Helpdesk (ticketing process of an Italian software company; 3,804 cases, 13,710 events, 9 activities) and BPI'12 W (work items of a loan application process of a Dutch bank, "complete" events only; 9,658 cases, 72,413 events, 6 activities in the file used by the code).
+- **Split:** chronological, first 2/3 of cases for training, last 1/3 for testing.
+- **Evaluation:** every prefix of length 2 ≤ k < case length; accuracy for next activity, MAE in days for next event time, averaged over all predictions ("All" column).
 
-## 5. Key results (Helpdesk = the dataset we reproduce)
+## 5. Key results (Table 1, next activity and next event time)
 
-| Task | ProcessTransformer | Best baseline cited |
-|---|---|---|
-| Next activity accuracy | **85.63%** (F1 0.82) | 76.51% (Camargo et al.) |
-| Next event time MAE | **2.98 days** | 5.77 days (Tax et al.) |
-| Remaining time MAE | **3.72 days** | 10.38 days (Navarin et al.) |
+| Model | Helpdesk MAE (days) | Helpdesk accuracy | BPI'12 W MAE (days) | BPI'12 W accuracy |
+|---|---|---|---|---|
+| LSTM, 2 layers, 1 shared (**configuration of the published code**) | 3.77 | 0.7119 | 1.56 | **0.7600** |
+| LSTM, 3 layers, 1 shared | 3.76 | **0.7123** | – | – |
+| LSTM, 1 layer, 1 shared | **3.75** | 0.7072 | 1.57 | 0.7486 |
+| Simple RNN, 2 layers, 1 shared | 3.98 | 0.6624 | – | – |
+| van der Aalst et al., sequence abstraction (time) | 5.67 | – | 1.91 | – |
+| Breuker et al. (next activity) | – | – | – | 0.719 |
+| Evermann et al. (next activity) | – | – | – | 0.623 |
 
-Across the 5 logs used for comparison, average next-activity accuracy is 80.58% vs 76.11% for the best baseline. The model is weaker on BPIC13 (62.11%), which the authors explain by fewer but longer cases.
+## 6. Points to check during reproduction (my questions)
 
-## 6. Limitations stated by the authors
-
-- Baselines used different preprocessing and extra features, so comparisons are not perfectly fair.
-- A GAN-based method was not compared.
-- Each task is trained separately (no multi-task model).
-
-## 7. Points to check during reproduction (my own questions)
-
-1. Does the official code run today (2026 library versions)?
-2. Does the code match the paper (architecture, learning rate, epochs)?
-3. Is the "average over prefix length" metric a fair summary? Large k values have very few test samples.
-4. How much does deep learning add compared with a very simple baseline (e.g. "predict the most frequent next step after the last activity")?
+1. Does the 2017 code (Python 2, Keras 2.0) still run, and with how many changes?
+2. Do we obtain the published numbers with the published configuration?
+3. Does the code match the paper (optimizer, features)?
+4. How much does the LSTM add compared with a simple frequency rule on the same split?

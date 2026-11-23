@@ -1,0 +1,10 @@
+../data/helpdesk.csv: 3804 cases, train 2536, test 1268, test predictions 1993
+  accuracy majority       : 0.1872
+  accuracy last_activity  : 0.6944
+  accuracy prefix_lookup  : 0.6939
+  next-time MAE global_mean         : 4.259 days
+  next-time MAE by_last_activity    : 4.432 days
+  next-time MAE by_k_last_activity  : 4.375 days
+  next-time MAE global_median       : 3.877 days
+  next-time MAE median_by_last      : 3.661 days
+  next-time MAE median_by_k_last    : 3.715 days

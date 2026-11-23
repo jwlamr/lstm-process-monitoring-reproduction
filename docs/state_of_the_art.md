@@ -1,51 +1,45 @@
-# State of the art — Predictive Business Process Monitoring
+# State of the art — around Tax et al. (2017)
 
 ## Timeline
 
 ```
-Process mining (2000s–)      Classical ML (2010s)        Deep learning (2017–2020)          Attention (2021–)
-──────────────────────       ────────────────────        ──────────────────────────         ─────────────────
-Discover process models   →  Hand-crafted features   →   LSTMs on event sequences       →   Transformer
-from event logs              + decision trees,           CNNs on "images" of traces          (ProcessTransformer)
-(e.g. transition systems,    random forests              Memory networks, GANs
- annotated with times)
+Before 2017: one method per task                     2017                       After 2017: Tax et al. as baseline
+─────────────────────────────────                    ────                       ──────────────────────────────────
+Time:     van der Aalst et al. (2011)                Tax et al.:                Camargo et al. (2019): LSTM + more attributes
+          transition systems + time annotations      one LSTM, shared +         Di Mauro / Pasquadibisceglie (2019): CNNs
+Activity: Breuker et al. (2016) probabilistic models specialised layers,        Taymouri et al. (2020): GANs
+          Le et al., Markov / sequence models        several tasks              Bukhsh et al. (2021): ProcessTransformer
+Deep learning: Evermann et al. (2016-2017)
+          first LSTM, word embeddings
 ```
 
-## 1. Classical process mining
+## 1. Predicting time-related properties
 
-Process mining discovers a process model (e.g. a Petri net or transition system) from an event log. Early predictive methods annotated these models with statistics, for example the average time remaining from each state. They are interpretable, but they depend on the quality of the discovered model and do not generalise well to complex, variable processes.
+**van der Aalst, Schonenberg & Song (2011)** build a *transition system* from the event log: each state is an abstraction of the prefix (the *set*, *bag* or *sequence* of activities seen so far) and is annotated with the times observed in the log. The prediction for a running case is the average time stored in its current state. Other approaches use stochastic Petri nets or queueing models. These methods are interpretable but were designed for one task (time).
 
-## 2. Classical machine learning
+## 2. Predicting the next activity
 
-Prefixes of cases are turned into fixed-size feature vectors (counts of activities, last state, elapsed time…) and fed into models such as random forests or gradient boosting. Performance depends a lot on feature engineering.
+**Breuker, Matzner, Delfmann & Becker (2016)** learn probabilistic models of the process (inspired by grammatical inference) to predict the next event, with a focus on comprehensible models. Other works used Markov models or sequence-pattern methods.
 
-## 3. Deep learning on sequences (the main baselines of the paper)
+## 3. First deep-learning approaches
 
-| Work | Idea |
-|---|---|
-| Evermann et al. (2017) | First LSTM for next-event prediction, with embeddings (inspired by language models). |
-| Tax et al. (2017) | LSTM with one-hot encoding; predicts next activity, next timestamp, remaining time and the full suffix. Became the reference baseline. |
-| Navarin et al. (2017) | LSTM for remaining time, using extra event attributes. |
-| Khan et al. (2018) | Memory-augmented neural networks. |
-| Camargo et al. (2019) | LSTM using both categorical (activity, role) and numeric features. |
-| Di Mauro et al. (2019) | Inception-style CNN for next activity. |
-| Pasquadibisceglie et al. (2019) | Event data transformed into image-like matrices for a CNN. |
-| Taymouri et al. (2020) | GANs for suffix and remaining-time prediction. |
+**Evermann, Rehse & Fettke (2016, journal version 2017)** were the first to use an LSTM for next-event prediction, inspired by language models (activities treated like words, with embeddings). They showed the potential of deep learning but did not predict time.
 
-Common limits pointed out by the paper: sequential processing (slow), difficulty with long traces, heavy preprocessing or task-specific design.
+## 4. Contribution of Tax et al. (2017)
 
-## 4. ProcessTransformer (2021)
+- One LSTM architecture for several tasks (next activity, next time, suffix, remaining time) instead of tailor-made methods.
+- Multi-task learning with shared and specialised layers.
+- Better results than all the baselines above on both logs (e.g. BPI'12 W: 76.0% accuracy vs 71.9% for Breuker et al.; 1.56 vs 1.91 days MAE for van der Aalst et al.).
+- Public code, which made it the standard baseline.
 
-Applies the Transformer of Vaswani et al. (2017) — the architecture behind modern language models — to event logs. Self-attention looks at all events of the prefix at once, so it can capture long-range dependencies and be trained in parallel. One architecture is used for three tasks, with only the activity sequence as input (plus three time features for time tasks).
+## 5. After 2017
 
-## 5. What this paper adds
+Most later work in predictive process monitoring compares to Tax et al.: richer LSTMs with more event attributes (Camargo, Dumas & González-Rojas, 2019), convolutional networks (Di Mauro et al., 2019; Pasquadibisceglie et al., 2019), generative adversarial nets (Taymouri et al., 2020) and Transformers (Bukhsh, Saeed & Dijkman, 2021 — reproduced as an extension in `extension/processtransformer/`). Benchmark studies later pointed out that differences in preprocessing, data splits and metrics make published numbers hard to compare.
 
-- First Transformer-based approach for PBPM tasks, evaluated on 9 real logs.
-- Higher average accuracy than LSTM/CNN baselines on next activity and lower MAE on time tasks.
-- Simple input (no hand-crafted features), open-source code.
+## 6. Open questions relevant for my reproduction
 
-## 6. Open issues in the field (relevant for the discussion)
+- **Comparability:** results depend strongly on the split and on which prefixes are evaluated.
+- **Simple baselines:** many business processes are repetitive; how far does a frequency table get?
+- **Business adoption:** interpretability and maintenance (code written in 2017 no longer runs as-is).
 
-- **Comparability:** papers use different preprocessing, splits and metrics, so numbers from different papers are hard to compare. The authors themselves acknowledge this. Benchmark studies in the field (e.g. Rama-Maneiro, Vidal & Lama's review and benchmark of deep learning for PBPM) make the same point.
-- **Simple baselines:** many processes are very repetitive, so a simple frequency-based model can already be strong. We test this in our reproduction.
-- **Business adoption:** explainability and integration into operational tools remain key barriers for companies.
+*Note: publication years of the baselines are taken from the reference list of Tax et al. (2017) and should be double-checked against the PDF.*

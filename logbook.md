@@ -1,4 +1,4 @@
-# Logbook — ProcessTransformer reproduction
+# Logbook — Paper reproduction (Tax et al. 2017; first attempt: ProcessTransformer 2021)
 
 Format: date — what I did — result / problem — decision.
 
@@ -67,13 +67,48 @@ Environment: Python 3.13, TensorFlow 2.21, pandas 3, NumPy 2 (CPU, 2 cores).
 - Report draft with results, discussion and business perspective (`report/`).
 - Colab notebook that replays everything end to end.
 
+## 23/11/2026 — Change of paper: a "pillar" paper is required
+- Clarification of the brief: the paper must be a well-known, foundational ("pillar") paper.
+- Checked citations on OpenAlex: ProcessTransformer (2021) = 152 citations (preprint); **Tax et al. (2017), CAiSE = 738 citations**, the reference baseline of predictive process monitoring; Evermann et al. (2017) = 518; Camargo et al. (2019) = 319.
+- **Decision: switch to Tax et al. (2017).** Same business problem and same Helpdesk process, so the work on ProcessTransformer is kept as an extension ("recent model") in `extension/processtransformer/`.
+- Pitch for 24/11 rebuilt around Tax et al.: business problem, state of the art (van der Aalst 2011, Breuker 2016, Evermann 2016), the paper, reproduction plan, planning. Results kept out of the pitch on purpose.
+- Repository renamed `lstm-process-monitoring-reproduction`.
+
+## 23/11/2026 — Reading Tax et al. (2017)
+- Notes in `docs/paper_notes.md`, state of the art in `docs/state_of_the_art.md`.
+- Targets (Table 1, configuration of the published code: LSTM, 2 layers, 1 shared, 100 neurons): Helpdesk 0.7119 accuracy / 3.77 days MAE; BPI'12 W 0.7600 / 1.56 days.
+- Protocol: chronological split, first 2/3 of cases for training, last 1/3 for testing; prefixes 2 ≤ k < case length.
+- Paper vs code: the paper mentions Adam, the code uses Nadam (lr 0.002, gradient clipping), early stopping with patience 42, up to 500 epochs, batch size = longest case. I follow the code.
+
+## 23/11/2026 — Porting the 2017 code
+- Official repository: Python 2.7, Keras 2.0 (`izip`, `unichr`, `unicode`, `keras.layers.recurrent`, `Nadam(schedule_decay=…)`, files opened in binary mode). It does not run with today's Python.
+- Minimal port to Python 3 + `tf-keras` (Keras 2 API): imports, Python 2 syntax, file modes, log name and model file passed as arguments. 48 changed lines in `train.py`, 28 in the evaluation script (`code/tax2017/python3_port.diff`). No change to model, features, split, training or evaluation logic.
+- The data in the authors' repository matches the paper: Helpdesk 3,804 cases / 13,710 events / 9 activities; BPI'12 W 9,658 cases / 72,413 events / 6 activities.
+
+## 23/11/2026 — Bug found in the official evaluation script
+- In `evaluate_next_activity_and_time.py`, the lists `times2` and `times3` are never reset when a new case starts. All cases share the same list, so every test case gets the timestamps of the first events of the log → wrong time-of-day and day-of-week features at test time (checked with a small script: all 3,804 cases point to the same list).
+- Wrote `evaluate_fixed.py` (2 lines added) to measure the effect.
+
+## 23/11/2026 — Simple baselines on the same split
+- `baselines_tax_split.py`: same split, same evaluated prefixes, same metrics.
+- First version wrongly scored the end of the case as a "next activity"; the official evaluation does not (no row is written when the case has ended). Fixed → 1,993 test predictions on Helpdesk, exactly as the official script.
+- Helpdesk: last-activity rule 69.44% accuracy; median time after the last activity 3.66 days MAE (means are worse: MAE is minimised by the median).
+- BPI'12 W: last-activity rule **78.70%** accuracy (paper's LSTM: 76.00%; Breuker et al.: 71.9%); median by (prefix length, last activity) 1.56 days MAE (paper's LSTM: 1.56).
+
+## 23/11/2026 — Training and evaluation on Helpdesk
+- Run 1: training interrupted at epoch 53 by an environment restart. Evaluation of its best checkpoint (epoch 26): **71.00% accuracy, 3.62 days MAE**.
+- Run 2: full training, early stopping at epoch 62 (best epoch 20, ~8 s/epoch on CPU). Evaluation: **70.75% accuracy, 3.62 days MAE** (paper: 71.19%, 3.77). → **Reproduction successful.**
+- With the evaluation bug fixed: 70.70%, 3.62 days → the bug has almost no effect; the model hardly relies on these features.
+- By prefix length: LSTM and simple rule are almost identical for k = 2 (76.9% vs 76.4%, 1,200 of 1,993 predictions); the LSTM's advantage comes from k = 3 (59.3% vs 50.3%); the rule is better for k = 4–5.
+- BPI'12 W training started but stopped: ~150 s per epoch on 2 CPU cores, so several hours with early stopping → to be run on a Colab GPU (notebook section 7).
+
 ---
 
 ## Next steps (planned)
-- [ ] 22–23/11: rehearse the 5-minute pitch (target: 50 s per slide).
+- [ ] 23/11: rehearse the 5-minute pitch on Tax et al. (target: under 5 min).
 - [ ] 24/11: pitch + summarise and evaluate the other students (`docs/peer_evaluation_template.md`).
-- [ ] Re-run the notebook myself on Google Colab and compare with these results (variance between runs).
-- [x] Repeat training to measure variance (3 runs next activity, 2 runs time tasks).
-- [ ] Third run for the time tasks.
-- [ ] Optional: try the paper's learning rate (10⁻²) and a second dataset (BPIC 2012).
-- [ ] Write the final report and finalise slides (end of December).
+- [ ] Run `notebooks/Tax2017_reproduction.ipynb` myself on Google Colab (GPU), including BPI'12 W, and compare with these results.
+- [x] ProcessTransformer extension: 3 runs next activity, 2 runs time tasks.
+- [ ] ProcessTransformer extension: third run for the time tasks.
+- [ ] Several runs on Helpdesk for variance; optional: suffix and remaining-time prediction.
+- [ ] Write the final report on Tax et al. and finalise slides (end of December).

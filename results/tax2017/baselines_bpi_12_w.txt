@@ -1,0 +1,10 @@
+../data/bpi_12_w.csv: 9658 cases, train 6440, test 3218, test predictions 17439
+  accuracy majority       : 0.3609
+  accuracy last_activity  : 0.7870
+  accuracy prefix_lookup  : 0.7642
+  next-time MAE global_mean         : 2.022 days
+  next-time MAE by_last_activity    : 1.761 days
+  next-time MAE by_k_last_activity  : 1.748 days
+  next-time MAE global_median       : 1.772 days
+  next-time MAE median_by_last      : 1.572 days
+  next-time MAE median_by_k_last    : 1.561 days

@@ -1,63 +1,70 @@
-# Reproducing ProcessTransformer — AI for business process prediction
+# Reproducing Tax et al. (2017) — Predictive Business Process Monitoring with LSTM Neural Networks
 
 **Student:** Jules Amimer — MSc AI for Business (NEOMA x INSA)
-**Paper:** Bukhsh, Saeed & Dijkman (2021). *ProcessTransformer: Predictive Business Process Monitoring with Transformer Network.* [arXiv:2104.00721](https://arxiv.org/abs/2104.00721) — [official code](https://github.com/Zaharah/processtransformer)
+**Paper:** N. Tax, I. Verenich, M. La Rosa, M. Dumas (2017). *Predictive Business Process Monitoring with LSTM Neural Networks.* CAiSE 2017, Springer LNCS, pp. 477–492. [arXiv:1612.02130](https://arxiv.org/abs/1612.02130) — [official code](https://github.com/verenich/ProcessSequencePrediction)
 
 ## Why this paper
-Companies record every step of their processes (tickets, orders, loan applications) in event logs. **Predictive Business Process Monitoring** uses these logs to predict how a running case will continue: *what happens next, when, and when will the case be finished?* This paper applies a Transformer — the architecture behind modern language models — to this problem. It is a concrete example of AI embedded in an operational business process, which is the core of AI consulting.
+Companies record every step of their processes (support tickets, loan applications, orders) in **event logs**. *Predictive business process monitoring* uses these logs to predict how a running case will continue: **what happens next, and when?** Tax et al. (2017) showed that a single LSTM neural network can replace the tailor-made methods used before for each prediction task. With 738 citations (OpenAlex, Nov. 2026) it is the **reference paper of the field**: later work (CNNs, GANs, Transformers) uses it as its baseline. It connects directly to my professional objective, AI consulting: putting AI inside real business processes.
 
 ## What I did
-1. Read the paper and mapped the state of the art → [`docs/paper_notes.md`](docs/paper_notes.md), [`docs/state_of_the_art.md`](docs/state_of_the_art.md)
-2. Reproduced the 3 tasks on the **Helpdesk** event log (4,580 cases, 21,348 events, 14 activities) with the **official code** → [`notebooks/ProcessTransformer_reproduction.ipynb`](notebooks/ProcessTransformer_reproduction.ipynb)
-3. Fixed 2 compatibility issues needed to run the 2021 code in 2026 → [`code/compatibility_fixes.patch`](code/compatibility_fixes.patch)
-4. Audited the evaluation code (averaging over prefix lengths, a bug in the summary row)
-5. **Extension:** compared the Transformer with simple frequency rules on the same split → [`code/baselines.py`](code/baselines.py)
-6. Documented everything day by day → [`logbook.md`](logbook.md)
+1. Read the paper and mapped its state of the art → [`docs/paper_notes.md`](docs/paper_notes.md), [`docs/state_of_the_art.md`](docs/state_of_the_art.md)
+2. **Ported the authors' 2017 code** (Python 2.7 / Keras 2.0) to Python 3 / `tf-keras` with minimal changes → [`code/tax2017/`](code/tax2017/), [`python3_port.diff`](code/tax2017/python3_port.diff)
+3. **Reproduced Table 1 on Helpdesk** (next activity accuracy, next event time MAE) with the configuration published in the repository → [`results/tax2017/`](results/tax2017/)
+4. **Found and tested a bug** in the official evaluation script (time features of the test cases) → [`code/tax2017/evaluate_fixed.py`](code/tax2017/evaluate_fixed.py)
+5. **Extension:** compared the LSTM with simple frequency rules on exactly the same split → [`code/tax2017/baselines_tax_split.py`](code/tax2017/baselines_tax_split.py)
+6. **Extension:** reproduction of a recent model of the field, ProcessTransformer (Bukhsh et al., 2021) → [`extension/processtransformer/`](extension/processtransformer/)
+7. Documented everything day by day → [`logbook.md`](logbook.md)
 
-## Results (Helpdesk)
+## Results — Helpdesk (3,804 cases, 13,710 events, 9 activities)
 
-| Metric | Paper | Our reproduction (paper protocol) | Weighted by # test cases | Simple rule (weighted) |
-|---|---|---|---|---|
-| Next activity accuracy | 85.63% | 83.69% ± 0.77 (3 runs) | 80.07% | 79.70% |
-| Next event time MAE | 2.98 days | 2.88 ± 0.02 (2 runs) | 4.14 days | 5.16 days |
-| Remaining time MAE | 3.72 days | 3.98 ± 0.21 (2 runs) | 5.37 days | 6.48 days |
+| | Next activity accuracy | Next event time MAE |
+|---|---|---|
+| Paper — LSTM, 2 layers, 1 shared (published configuration) | 71.19% | 3.77 days |
+| **Our reproduction** — run 2 (full training, early stopping at epoch 62) | **70.75%** | **3.62 days** |
+| Our reproduction — run 1 (training interrupted at epoch 53, best checkpoint) | 71.00% | 3.62 days |
+| Our run 2 with the evaluation bug fixed | 70.70% | 3.62 days |
+| Simple rule: most frequent next activity after the last one | 69.44% | — |
+| Simple rule: median time to next event after the last activity | — | 3.66 days |
+| Process mining baseline reported in the paper (van der Aalst et al.) | — | 5.67 days |
+
+![Helpdesk comparison](results/tax2017/helpdesk_comparison.png)
 
 **Key findings**
-- The official code reproduces the paper closely (time tasks within 0.1–0.3 days, next activity about 2 points below).
-- The paper averages metrics over prefix lengths, so a prefix length with 1 test case weighs as much as one with 916. Counting every case once lowers accuracy by about 3.6 points.
-- For next activity, a simple rule ("most frequent next step after the last activity") is almost as accurate as the Transformer. For time predictions, the Transformer saves about 1 day of error.
-- The 2021 code needed 2 one-line fixes to run with 2026 libraries, and the evaluation script has a small bug in its summary row.
+- **The reproduction is successful:** 70.75% vs 71.19% accuracy and 3.62 vs 3.77 days MAE, with the authors' code and data.
+- **The 2017 code no longer runs as-is** (Python 2, Keras 2.0 APIs); a minimal port was needed.
+- **Evaluation bug:** the official evaluation script never resets the list of timestamps between cases, so every test case receives the time-of-day and day-of-week features of the first events of the log. Fixing it changes the results by less than 0.1 point: the model hardly uses these features.
+- **A simple frequency rule is almost as good as the LSTM** on Helpdesk: 69.4% vs 70.8% accuracy, and the same time error (3.66 vs 3.62 days). The LSTM's advantage comes mostly from prefixes of length 3. On BPI'12 W, the same rule reaches 78.7% accuracy (paper's LSTM: 76.0%), to be confirmed by running the LSTM ourselves.
 
-![Summary](results/summary_comparison.png)
+![Accuracy by prefix length](results/tax2017/helpdesk_accuracy_by_prefix.png)
+
+**Not done yet:** BPI'12 W with the LSTM (several hours on CPU; planned on a Colab GPU), suffix and remaining-time prediction, several runs for variance.
 
 ## Repository structure
 ```
-├── README.md                 ← this file
-├── logbook.md                ← day-by-day work log
-├── docs/                     ← paper notes, state of the art, peer-evaluation template
-├── notebooks/                ← Colab notebook (end-to-end reproduction)
-├── code/                     ← compatibility patch, baselines, analysis script, run script
-├── results/                  ← CSV results and figures
-├── slides/                   ← presentation (pitch 24/11 + final)
-└── report/                   ← final report (Markdown + PDF)
+├── README.md
+├── logbook.md                      ← day-by-day work log
+├── docs/                           ← paper notes, state of the art, peer-evaluation template
+├── notebooks/Tax2017_reproduction.ipynb   ← Colab notebook, end to end
+├── code/tax2017/                   ← Python 3 port of the official code, bug fix, baselines, figures
+├── results/tax2017/                ← predictions, summaries, logs, figures, trained model
+├── extension/processtransformer/   ← reproduction of ProcessTransformer (2021) on Helpdesk
+├── slides/                         ← presentations
+└── report/                         ← final report (end of December)
 ```
 
 ## How to reproduce
-Open the notebook in Google Colab and run all cells (CPU is enough, ~30–40 min for the 3 tasks at 100 epochs).
+Open [`notebooks/Tax2017_reproduction.ipynb`](notebooks/Tax2017_reproduction.ipynb) in Google Colab and run all cells (Helpdesk ≈ 15–25 min on CPU; use a GPU for BPI'12 W).
 
 Locally:
 ```bash
-git clone https://github.com/Zaharah/processtransformer.git && cd processtransformer
-pip install tf-keras && export TF_USE_LEGACY_KERAS=1
-patch -p1 < ../code/compatibility_fixes.patch
-# put helpdesk.csv in datasets/helpdesk/
-for t in next_activity next_time remaining_time; do python data_processing.py --dataset=helpdesk --task=$t; done
-python next_activity.py --dataset=helpdesk --epochs=100
-python next_time.py --dataset=helpdesk --epochs=100
-python remaining_time.py --dataset=helpdesk --epochs=100
-python ../code/baselines.py datasets/helpdesk/processed ../results/baselines_next_activity.csv
-python ../code/analyze_results.py results/helpdesk datasets/helpdesk/processed ../results
+git clone https://github.com/verenich/ProcessSequencePrediction.git && cd ProcessSequencePrediction/code
+pip install tf-keras distance jellyfish && export TF_USE_LEGACY_KERAS=1
+cp <this repo>/code/tax2017/*.py .
+python train.py helpdesk.csv
+python evaluate_next_activity_and_time.py helpdesk.csv output_files/models/<best model>.h5
+python summarize_results.py output_files/results/next_activity_and_time_helpdesk.csv
+python baselines_tax_split.py ../data/helpdesk.csv
 ```
 
-## Licence and credits
-The model code belongs to its authors (MIT licence). Helpdesk event log: Verenich (2016), 4TU.ResearchData. My additions (notebook, baselines, analysis, documents) are released under MIT.
+## Credits
+Model code and data: Tax, Verenich, La Rosa & Dumas (2017). My additions (port, bug fix, baselines, analysis, documents) are released under MIT.

@@ -1,0 +1,28 @@
+output_files/results/next_activity_and_time_helpdesk.csv
+  predictions: 1993   accuracy: 0.7075   next-event-time MAE: 3.625 days
+                  n  accuracy  mae_days
+Prefix length                          
+2              1200     0.769     3.392
+3               445     0.593     4.838
+4               195     0.605     2.594
+5                89     0.652     3.832
+6                39     0.795     2.163
+7                10     0.600     3.875
+8                 7     0.571     1.250
+9                 4     0.500     3.411
+10                3     1.000     2.430
+11                1     1.000     1.274
+output_files/results/next_activity_and_time_FIXED_helpdesk.csv
+  predictions: 1993   accuracy: 0.7070   next-event-time MAE: 3.623 days
+                  n  accuracy  mae_days
+Prefix length                          
+2              1200     0.769     3.390
+3               445     0.593     4.834
+4               195     0.605     2.618
+5                89     0.640     3.813
+6                39     0.795     2.126
+7                10     0.600     3.906
+8                 7     0.571     1.080
+9                 4     0.500     3.407
+10                3     1.000     2.455
+11                1     1.000     1.274
